@@ -378,5 +378,30 @@ function WidthPrinter(){
 
 ```
 //useMounted 커스텀 훅
+function useMounted(){
+    const [mounted,setMounted] = useState(false);
+    //마운트는 실제돔에 반영된 상태를 말한다.
 
+    useEffect(()=> setMounted(true),[]);//빈배열로 의존성 배열 설정시 부수효과함수는 생성시에만 호출된다.
+
+    return mounted;
+}
 ```
+- 훅 사용시 규칙 1 : 하나의 컴포넌트에서 훅 호출순서는 항상 같아야한다.(조건문,반복문,함수안에서 훅을 선언하면 안된다.)
+- 훅 사용시 규칙 2 : 훅은 함수형 컴포넌트 또는 커스텀 훅 안에서만 호출돼야 한다.
+```
+function Profile(){
+    const [age,setAge] = useState(0);
+    const [name,setName] = useState('');
+    //...
+    useEffect(()=> {
+    //...
+    setAge(23); 
+    //const [age,setAge] = useState(0); 구문이 조건에 의해 실행되지 않는다면,
+    //name 상태값은 23이된다. 내부적으로 훅은 배열로 관리되고, 배열에는 상태값이 선언한 순서대로 들어간다.
+    //따라서 setAge시 함수호출시 배열에 첫번째 원소에 저장된 name상태값이 변하므로 name값이 변경된다.
+    },[]);
+    //...
+}
+```
+
