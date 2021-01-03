@@ -405,3 +405,435 @@ function Profile(){
 }
 ```
 
+#### 콘텍스트 API(상위에서 하위로 데이터 전달)
+- 상위컴포넌트에서 하위컴포넌트로 데이터를 전달할때 속성값을 사용하는데, 전달할 컴포넌트가 많거나, 깊이가 깊다면 코드가 복잡해진다. <strong>콘텍스트API를 사용하면</strong> 깊이가 어떻든간에 <strong>상위컴포넌트에서 하위컴포넌트로 직접 데이터</strong>를 전달할 수 있다.
+```
+const UserContext = React.createContext('');//기본값은 빈문자열
+
+function App(){
+    return (
+        <div>
+            <UserContext.Provider value="mike">//mike라는 값을 consumer로 전달
+                <div>상단 메뉴</div>
+                <Profile />
+                <div>하단 메뉴</div>
+            </UserContext.Provider>
+        </div>
+    )
+}
+
+function Profile(){
+    return (
+        <div>
+            <Greeting />
+        </div>
+    )
+}
+
+function Greeting(){
+    return (
+        <UserContext.Consumer>
+            {username => <p>{`${username}님 안녕하세요.`}</p>}//mike값을 username으로 받는다.
+        </UserContext.Consumer>
+    )
+}
+```
+
+- 콘텍스트의 Provider와 Consumer컴포넌트를 중첩해서 사용할 수 있으며, 상위컴포넌트에서 하위컴포넌트로 함수를 전달할 수도 있다.(상위컴포넌트의 상태값을 변경하기위한 상태변경함수도 전달가능)
+```
+const UserContext = React.createContext({ username:"", helloCount:0 });
+const SetUserContext = React.createContext(()=>{});
+
+function App(){
+    const [user,setUser] = useState({ username:"mike", helloCount:0 });
+    return (
+        <div>
+            <SetUserContext.Provider value={setUser}> //setUser함수 Consumer로 전달
+                <UserContext.Provider value={user}>//user 상태값 Consumer로 전달
+                    <Profile />
+                </UserContext.Provider>
+            </SetUserContext>
+        </div>
+    );
+}
+
+function Profile(){
+    return(
+        <div>
+            <Greeting />
+        </div>
+    )
+}
+
+function Greeting(){
+    return (
+        <SetUserContext.Consumer>
+            {setUser => (
+                <UserContext.Consumer>
+                {({ username,helloCount }) => ( //구조분해할당을 통해 상태값(객체)의 프로퍼티 전달받음 
+                    <>
+                        <p>{`${username}님 안녕하세요`}</p>
+                        <p>{`인사횟수 : ${helloCount}`}</p>
+                        <button
+                            onClick={() =>
+                                setUser({ username,helloCount:helloCount + 1 });//클릭시 user상태값을 덮어씀
+                            }
+                        >
+                    </>
+                )}
+                </UserContext.Consumer>
+            )}
+        </SetUserContext.Consumer>
+    )
+}
+```
+- 콘텍스트API 사용시 Provider에서 새로운 객체로 데이터를 전달하면 컴포넌트가 생성될때마다 Consumer컴포넌트도 다시 렌더링된다.
+```
+const UserContext = React.createContext({ username:"" });
+
+function App(){
+    const [username,setUsername] = useState("");
+
+    return (
+        <div>
+            //<UserContext.Provider value={{username}}>
+            //다음과같이 새로운 객체로 생성하여 전달하면 
+            //Consumer는 동일한 값을 받아도 매번 리렌더링된다.
+
+            <UserContext.Provider value={username}> //이렇게 보내야한다.
+            //...
+        </div>
+    )
+}
+```
+
+#### ref속성(자식요소 접근하기)
+- 자식요소(하위 DOM,컴포넌트)에 접근하기 위해서 ref속성값을 이용할 수 있습니다.
+```
+import React,{ useRef, useEffect } from "react";
+
+function TextInput(){
+    const inputRef = useRef();//useRef훅이 반환하는 ref객체를 통해서 자식요소에 접근가능하다.
+    
+    useEffect(()=>{
+        inputRef.current.focus();//inputRef(ref객체)를 통해 자식에 접근하여 focus함수 실행
+    },[]);
+
+    return(
+        <div>
+            <input type="text" ref={inputRef}>//자식요소 ref속성에 ref객체를 입력해야한다.
+            <button>저장</button>
+        </div>
+    )
+}
+```
+- 손자요소에 접근하기 위해서 속성값 이용해 ref객체를 전달한다.
+```
+function TextInput({ inputRef }){//속성값을 통해 ref객체를 전달받는다.
+    return (
+        <div>
+            <input type="text" ref={inputRef} />
+            <button>저장</button>
+        </div>
+    )
+}
+
+function Form(){
+    const inputRef = useRef();
+    useEffect(()=>{
+        inputRef.current.focus();
+    },[]);
+
+    return (
+        <div>
+            <TextInput inputRef={inputRef} />
+            <button onClick={() => inputRef.current.focus()}>텍스트로 이동</button>
+        </div>
+    );
+}
+```
+
+- forwardRef함수를 사용하면 부모컴포넌트에서 넘어온 ref값을 직접 처리할 수 있다.
+```
+const TextInput = React.forwardRef((props,ref)=> (
+    //forwardRef함수를 통해 ref객체를 ref라는 이름으로 받는다.
+    <div>
+        <input type="text" ref={ref} />//ref속성에 ref객체 입력
+        <button>저장</button>
+    </div>
+));
+
+function Form(){
+    //...
+    return (
+        <div>
+            <TextInput ref={inputRef} />//컴포넌트를 통해 ref객체전달
+            <button onClick={() => inputRef.current.focus() }>텍스트로 이동</button>
+        </div>
+    )
+}
+```             
+- ref속성값으로 함수를 입력하는 경우 해당함수는 자식요소가 생성되거나 제거되는 시점에 호출된다.
+```
+function Form(){
+    const [text,setText] = useState(INITIAL_TEXT);
+    const [showText,setShowText] = useState(true);
+
+    return (
+        <div>
+            {showText && (
+                <input 
+                type="text"
+                ref={ref => ref && setText(INITIAL_TEXT)}
+                //input이 제거될때 함수가 실행된다(ref인수로 null이 넘어옴).
+                //즉 아무짓도 하지않음
+                //input이 생성될때 함수가 실행된다.(ref인수로 해당 DOM요소(input)참조값이 넘어온다)
+                value={text}
+                onChange={e => setText(e.target.value)}
+                //지금 ref속성값에 함수를 직접 입력하였는데 이러면, 상태변경함수가 실행될때마다,
+                //ref로 입력된 함수가 실행된다.(계속 새로운 함수를 입력하기때문)
+                //함수가 매번 실행되지 않게 하기위해서는 useCallback(함수재사용훅)을 사용해야한다.
+                />
+            )}
+            <button onClick={() => setShowText(!showText)}>
+                보이기/가리기
+            </button>
+            //최초버튼 클릭시 input이 사라진다.
+            //두번째로 버튼클릭시 input이 생성된다.
+        </div>
+    );
+}
+const INITIAL_TEXT = "안녕하세요";
+```
+- useCallback훅을 사용하면 생성된 함수(함수도 일급객체로 주소를 가지고있다.)를 계속 재사용할 수 있다.(참조값 고정)
+```
+import React,{ useState , useCallback } from "react";
+
+function Form(){
+    const [text,setText] = useState(INITIAL_TEXT);
+    const [showText,setShowText] = useState(true);
+
+    const setInitialText = useCallback(ref => ref && setText(INITIAL_TEXT),[]);
+
+    return (
+        <div>
+            {showText && (
+                <input 
+                type="text"
+                ref={setInitialText}
+                //상태변경함수가 실행되도 함수주소는 고정이므로 실행되지않음
+                value={text}
+                onChange={e => setText(e.target.value)}
+                />
+            )}
+            //...
+        </div>
+    );
+}
+```
+
+#### 리액트 내장 훅
+- useContext를 사용하면 Provider로부터 Consumer컴포넌트없이 데이터를 전달받을 수 있다.
+```
+const UserContext = React.createContext();
+const user = { name:"mike", age:23 };
+
+function ParentComponent(){
+    return (
+        <UserContext.Provider value={user}>
+            <ChildComponent />
+        </UserContext.Provider>
+    )
+}
+
+function ChildComponent(){
+    const user = useContext(UserContext);//Provider로 부터 value를 전달받음
+    console.log(`user: ${user.name}, age: ${user.age}`);
+    //...
+}
+```
+
+- useRef는 자식요소에 접근하기 위한 용도 이외에도 렌더링과 무관한 값을 저장하는 용도에도 사용한다.
+- 무관한값을 상태값에 저장하는 것은 렌더링과 연관되기때문에 적절치않다.
+```
+import React, { useState, useRef, useEffect } from 'react';
+
+function Profile(){
+    const [age,setAge] = useState(20);
+    const prevAgeRef = useRef(20);
+    useEffect(()=> {
+        prevAgeRef.current = age;
+    },[age]);//컴포넌트가 마운트된후 호출된다.
+    
+    const prevAge = prevAgeRef.current;//useEffect보다 먼저 실행됨 즉, 이전 age값이 저장된다.
+    const text = age === prevAge ? 'same' : age > prevAge ? 'older' : 'younger';//이전값과 같다면 same 이전값보다 크다면 older 작다면 younger
+    return (
+        <div>
+            <p>{`age ${age} is ${text} than age ${prevAge}`}</p>
+            <button
+                onClick = {() => {
+                    const age = Math.floor(Math.random()*50 + 1);//Math.floor는 정수값 하한을 반환
+                    setAge(age);
+                }}
+            >
+            나이 변경
+            </button>
+        </div>
+    );
+}
+``` 
+- useMemo는 함수의 반환값을 재활용하는 용도로 사용된다.
+```
+import React,{ useMemo } from "react";
+import { runExpensiveJob } from './util';
+
+function MyComponent({v1,v2}){
+    const value = useMemo(()=> runExpensive(v1,v2),[v1,v2]);//v1,v2가 다를 경우에만 다시 함수를 실행하여 value를 갱신하고 같다면 동일한 반환값을 사용한다.
+    return <p>{`value is ${value}`}</p>;
+}
+```
+- useCallback 훅은 컴포넌트가 렌더링 될때마다 새로운 함수가 속성에 입려되는 것으로 인해 자식컴포넌트가 매번 리렌더링되는 것을 방지하기 위함이다. 
+```
+import React,{ useState, useCallback } from 'react';
+import { saveToServer } from './api';
+import UserEdit from './UserEdit';
+
+function Profile(){
+    const [name,setName] = useState('');
+    const [age,setAge] = useState(0);
+    const onSave = useCallback(() => saveToServer(name,age),[name,age]);
+    return (
+        <div>
+            <p>{`name is ${name}`}</p>
+            <p>{`age is ${age}`}</p>
+            <UserEdit
+                //onSave={() => saveToServer(name,age)}
+                //Profile 컴포넌트가 렌더링될때마다 onSave속성으로 매번 새로운 함수가 입력된다.
+                //UserEdit이 React.memo를 사용한다해도 매번 함수주소가 바뀌기때문에 소용이없다.
+                //그렇기때문에 함수주소 고정을 위해 useCallback을 사용하면 쓸모없는 리렌더링을 방지할수있다.
+                onSave={onSave}
+                setName={setName}
+                setAge={setAge}
+            />
+        </div>
+    );
+}
+```
+
+- useReducer를 사용하면 redux처럼 dispatch와 액션을 통해 상태값을 갱신할 수 있으며, 갱신된 상태값을 참조할 수 있다.
+```
+import React,{ useReducer } from 'react';
+
+const INITIAL_STATE = {name: 'empty',age: 0};
+function reducer(state,action){
+    switch(action.type){
+        case 'setName'://dispatch로 날아온 action type이 setName일경우
+            return {...state,name: action.name};//이전 state에서 name속성만 갱신한뒤 상태값덮어씀
+        case 'setAge':
+            return {...state,age: action.age};
+        default:
+            return state;
+    }
+}
+
+function Profile(){
+    const [state,dispatch] = useReducer(reducer,INITIAL_STATE);
+    return (
+        <div>
+            <p>{`name is ${state.name}`}</p>
+            <p>{`age is ${state.age}`}</p>
+            <input
+                type="text"
+                value={state.name}
+                onChange={e =>
+                    dispatch({ type:'setName',name:e.currentTarget.value })
+                }
+            />
+            <input
+                type="number"
+                value={state.age}
+                onChange={e =>
+                    dispatch({ type:'setAge',age:e.currentTarget.value })
+                }
+            >
+        </div>
+    );
+}
+```
+
+- 하위 컴포넌트로 dispatch를 전달해야 하위컴포넌트에서 dispatch호출을 통해 state를 갱신 할 수있다.
+```
+//...
+export const ProfileDispatch = React.createContext(null);
+//...
+function Profile(){
+    const [state,dispatch] = useReducer(reducer,INITIAL_STATE);
+    return (
+        <div>
+            <p>{`name is ${state.name}`}</p>
+            <p>{`age is ${state.age}`}</p>
+            <ProfileDispatch.Provider value={dispatch}>
+                <SomeComponent /> 
+                //해당 컴포넌트 하위에 있는 모든 컴포넌트는 콘텍스트를 통해
+                //dispatch를 호출할수 있습니다.
+            </ProfileDispatch.Provider>
+        </div>
+    );
+}
+```
+
+- useImperativeHandle훅을 사용하면 부모 컴포넌트에서 접근가능한 함수를 만들 수 있다.
+```
+//자식 컴포넌트
+import React, { forwardRef,useState,useImperativeHandle } from "react";
+
+function Profile(props,ref){
+    const [name,setName] = useState('');
+    const [age,setAge] = useState(0);
+
+    useImperativeHandle(ref, () => ({
+        addAge: value => setAge(age+value),
+        getNameLength: () => name.length,
+    }));
+
+    return (
+        <div>
+            <p>{`name is ${name}`}</p>
+            <p>{`age is ${age}`}</p>
+            //...
+        </div>
+    )
+}
+
+export default forwardRef(Profile);
+```
+```
+//부모 컴포넌트
+function Parent(){
+    const profileRef = useRef();
+    const onClick = () => {
+        if(profileRef.current){
+            console.log('current name length:',profileRef.current.getNameLength());
+            profileRef.current.addAge(5);
+        }
+    };
+
+    return (
+        <div>
+            <Profile ref={profileRef} />
+            <button onClick={onClick}>add Age 5</button>
+        </div>
+    );
+}
+```
+- useLayoutEffect는 useEffect가 렌더링결과가 돔에 반영된후 비동기적으로 호출되는거와 달리 동기적으로 호출된다.(렌더링 직후 돔요소의 값을 읽는 경우에는 useLayoutEffect가 적절하다.)
+- useDebugValue는 커스텀 훅에서 디버깅을 위해 사용할 수 있다.
+```
+function useToggle(initialValue){
+    const [value,setValue] = useState(initialValue);
+    const onToggle = () => setValue(!value);
+
+    useDebugValue(value? 'on':'off');//디버깅시 확인할 값을 훅의 매개변수로 입력한다.
+    return [value,onToggle];
+}
+```
